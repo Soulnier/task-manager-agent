@@ -140,6 +140,8 @@ def main():
                 print("Ошибка: модель не вернула вариантов ответа.")
                 continue
 
+            print(f"\nОтветила модель: {response.model}")
+
             choice = response.choices[0]
             answer = choice.message.content
 
