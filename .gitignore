@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# Песочница агента
+agent/workspace/
+
+# Виртуальное окружение и кэш Python
+.venv/
+*.pyc
