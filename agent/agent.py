@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from uuid import uuid4
 
 from dotenv import load_dotenv
 from openai import OpenAI, OpenAIError
@@ -30,6 +31,10 @@ SYSTEM_PROMPT = """
 Для записи файлов используй write_file.
 Если пользователь отказал в записи, сообщи об отказе и не повторяй
 попытку записи без новой просьбы пользователя.
+
+Для добавления задач используй add_task, для просмотра — list_tasks.
+Не редактируй tasks.json напрямую через write_file.
+Приоритет по умолчанию — mid, фильтр статуса по умолчанию — all.
 """.strip()
 
 
@@ -129,6 +134,86 @@ def write_file(path, content):
     file_path.write_text(content, encoding="utf-8")
     return f"Файл записан: {relative_path}"
 
+
+
+def load_tasks():
+    """Загружает задачи и проверяет структуру данных."""
+    tasks_path = resolve_workspace_path("tasks.json")
+    if not tasks_path.exists():
+        return []
+
+    try:
+        tasks = json.loads(read_file("tasks.json"))
+    except json.JSONDecodeError:
+        raise ValueError("Файл tasks.json содержит некорректный JSON.") from None
+
+    if not isinstance(tasks, list):
+        raise ValueError("В tasks.json должен храниться список задач.")
+
+    seen_ids = set()
+    for task in tasks:
+        if not isinstance(task, dict):
+            raise ValueError("Каждая задача должна быть JSON-объектом.")
+        task_id = task.get("id")
+        title = task.get("title")
+        if not isinstance(task_id, str) or not task_id:
+            raise ValueError("У задачи отсутствует корректный id.")
+        if task_id in seen_ids:
+            raise ValueError("В tasks.json обнаружены повторяющиеся id.")
+        seen_ids.add(task_id)
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError("У задачи отсутствует название.")
+        if task.get("priority") not in ("low", "mid", "high"):
+            raise ValueError("У задачи указан неизвестный приоритет.")
+        if task.get("status") not in ("todo", "done"):
+            raise ValueError("У задачи указан неизвестный статус.")
+    return tasks
+
+
+def add_task(title, priority):
+    """Добавляет задачу после подтверждения записи."""
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("Название задачи должно быть непустой строкой.")
+    if priority not in ("low", "mid", "high"):
+        raise ValueError("Приоритет должен быть low, mid или high.")
+
+    tasks = load_tasks()
+    task = {
+        "id": uuid4().hex,
+        "title": title.strip(),
+        "priority": priority,
+        "status": "todo",
+    }
+    tasks.append(task)
+    content = json.dumps(tasks, ensure_ascii=False, indent=2)
+    result = write_file("tasks.json", content)
+    if result.startswith("ОТКАЗ:"):
+        return "ОТКАЗ: пользователь запретил запись. Задача не добавлена."
+    return (
+        f"Задача добавлена: {task['title']}. "
+        f"Приоритет: {priority}. ID: {task['id']}."
+    )
+
+
+def list_tasks(status):
+    """Показывает задачи с фильтром по статусу."""
+    if status not in ("all", "todo", "done"):
+        raise ValueError("Статус должен быть all, todo или done.")
+    selected = [
+        task for task in load_tasks()
+        if status == "all" or task["status"] == status
+    ]
+    if not selected:
+        return "Задач с указанным статусом нет."
+    return "\n".join(
+        f"{number}. {task['title']} "
+        f"| приоритет: {task['priority']} "
+        f"| статус: {task['status']} "
+        f"| ID: {task['id']}"
+        for number, task in enumerate(selected, start=1)
+    )
+
+
 TOOLS = [
     {
         "type": "function",
@@ -175,43 +260,92 @@ TOOLS = [
             },
         },
     },
-]
-
-
-TOOLS.append({
-    "type": "function",
-    "function": {
-        "name": "write_file",
-        "description": (
-            "Создать или полностью перезаписать текстовый файл "
-            "внутри workspace. Вызывай по просьбе пользователя "
-            "сохранить или изменить файл. "
-            "Запись требует отдельного подтверждения пользователя. "
-            "Перед изменением существующего файла прочитай его."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "Путь файла относительно workspace.",
+    {
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": (
+                "Создать или полностью перезаписать текстовый файл "
+                "внутри workspace. Вызывай по просьбе пользователя "
+                "сохранить или изменить файл. "
+                "Запись требует отдельного подтверждения пользователя. "
+                "Перед изменением существующего файла прочитай его."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Путь файла относительно workspace.",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Полное новое содержимое файла.",
+                    },
                 },
-                "content": {
-                    "type": "string",
-                    "description": "Полное новое содержимое файла.",
-                },
+                "required": ["path", "content"],
+                "additionalProperties": False,
             },
-            "required": ["path", "content"],
-            "additionalProperties": False,
         },
     },
-})
+    {
+        "type": "function",
+        "function": {
+            "name": "add_task",
+            "description": (
+                "Добавить задачу в менеджер задач по просьбе пользователя. "
+                "Если приоритет не указан, используй mid. "
+                "Добавление требует подтверждения пользователя."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Название задачи.",
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["low", "mid", "high"],
+                        "description": "low — низкий, mid — средний, high — высокий.",
+                    },
+                },
+                "required": ["title", "priority"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_tasks",
+            "description": (
+                "Показать задачи с фильтром по статусу. "
+                "Если статус не указан, используй all."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["all", "todo", "done"],
+                        "description": "all — все, todo — незавершённые, done — выполненные.",
+                    },
+                },
+                "required": ["status"],
+                "additionalProperties": False,
+            },
+        },
+    },
+]
 
 
 TOOL_FUNCTIONS = {
     "list_files": list_files,
     "read_file": read_file,
     "write_file": write_file,
+    "add_task": add_task,
+    "list_tasks": list_tasks,
 }
 
 
