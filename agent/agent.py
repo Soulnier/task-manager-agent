@@ -9,10 +9,10 @@ from openai import OpenAI, OpenAIError
 
 
 if __package__:
-    from .context import estimate
+    from .context import estimate, ensure_context_budget
     from .sessions import Session
 else:
-    from context import estimate
+    from context import estimate, ensure_context_budget
     from sessions import Session
 
 
@@ -377,15 +377,16 @@ def execute_tool(name, raw_args):
         return f"ОШИБКА: {error}"
 
 
-def run_agent(client, model, messages, checkpoint=lambda _: None):
+def run_agent(client, model, messages, checkpoint=lambda _: None, budget=6000):
     """Выполняет не более MAX_STEPS запросов модели."""
     for step in range(1, MAX_STEPS + 1):
         print(f"\n--- Шаг {step}/{MAX_STEPS} ---")
 
-        print(f"INPUT estimate={estimate(messages, TOOLS)}")
+        view = ensure_context_budget(messages, TOOLS, budget)
+        print(f"INPUT estimate={estimate(view, TOOLS)} budget={budget}")
         response = client.chat.completions.create(
             model=model,
-            messages=messages,
+            messages=view,
             tools=TOOLS,
         )
 
@@ -405,6 +406,7 @@ def run_agent(client, model, messages, checkpoint=lambda _: None):
 
         print(f"finish_reason: {choice.finish_reason}")
 
+        messages[:] = view
         # Сохраняем ответ вместе с запросами инструментов, если они есть.
         messages.append(message.model_dump(exclude_none=True))
 
@@ -459,7 +461,10 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--session", default=os.getenv("SESSION_ID", "default"))
+    parser.add_argument("--budget", type=int, default=os.getenv("CONTEXT_BUDGET", "6000"))
     args = parser.parse_args()
+    if args.budget <= 0:
+        parser.error("Бюджет должен быть положительным.")
     try:
         session = Session(AGENT_DIR / "sessions", args.session, api_key)
         messages = session.load(SYSTEM_PROMPT)
@@ -498,7 +503,7 @@ def main():
 
             try:
                 session.save(messages)
-                answer = run_agent(client, model, messages, session.save)
+                answer = run_agent(client, model, messages, session.save, args.budget)
             except OSError as error:
                 print(f"Ошибка файла сессии: {error}")
                 break
