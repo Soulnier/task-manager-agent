@@ -10,9 +10,11 @@ from openai import OpenAI, OpenAIError
 
 if __package__:
     from .context import packed, estimate, ensure_context_budget
+    from .docs_search import search
     from .sessions import Session
 else:
     from context import packed, estimate, ensure_context_budget
+    from docs_search import search
     from sessions import Session
 
 
@@ -41,6 +43,7 @@ SYSTEM_PROMPT = """
 Если пользователь отказал в записи, сообщи об отказе и не повторяй
 попытку записи без новой просьбы пользователя.
 
+Для вопросов по документации сначала вызывай search_docs.
 Для добавления задач используй add_task, для просмотра — list_tasks.
 Не редактируй tasks.json напрямую через write_file.
 Приоритет по умолчанию — mid, фильтр статуса по умолчанию — all.
@@ -223,7 +226,17 @@ def list_tasks(status):
     )
 
 
+def search_docs(query, limit=3):
+    return search(WORKSPACE, query, limit)
+
+
 TOOLS = [
+    {"type": "function", "function": {
+        "name": "search_docs", "description": "Найти сведения по документации приложения перед ответом или действием.",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "Ключевые слова на русском языке"},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 5}},
+            "required": ["query"], "additionalProperties": False}}},
     {
         "type": "function",
         "function": {
@@ -350,6 +363,7 @@ TOOLS = [
 
 
 TOOL_FUNCTIONS = {
+    "search_docs": search_docs,
     "list_files": list_files,
     "read_file": read_file,
     "write_file": write_file,

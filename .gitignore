@@ -221,7 +221,12 @@ __marimo__/
 
 
 # Песочница агента
-agent/workspace/
+agent/workspace/*
+!agent/workspace/docs/
+agent/workspace/docs/*
+!agent/workspace/docs/tasks.md
+!agent/workspace/docs/files.md
+!agent/workspace/docs/sessions.md
 
 # Виртуальное окружение и кэш Python
 .venv/
