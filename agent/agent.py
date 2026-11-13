@@ -9,8 +9,10 @@ from openai import OpenAI, OpenAIError
 
 
 if __package__:
+    from .context import estimate
     from .sessions import Session
 else:
+    from context import estimate
     from sessions import Session
 
 
@@ -380,6 +382,7 @@ def run_agent(client, model, messages, checkpoint=lambda _: None):
     for step in range(1, MAX_STEPS + 1):
         print(f"\n--- Шаг {step}/{MAX_STEPS} ---")
 
+        print(f"INPUT estimate={estimate(messages, TOOLS)}")
         response = client.chat.completions.create(
             model=model,
             messages=messages,
