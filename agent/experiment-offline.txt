@@ -1,0 +1,164 @@
+
+=== trim, режим=локальный сценарий, бюджет=2184 ===
+
+--- Шаг 1/6 ---
+INPUT estimate=1874 budget=2184
+Ответила модель: offline-fixture
+usage: статистика отсутствует
+finish_reason: tool_calls
+Инструмент: search_docs
+Аргументы: {"query": "приоритет по умолчанию", "limit": 1}
+Результат: docs/tasks.md:
+Приоритет по умолчанию — mid (средний). Для срочной задачи укажите high, для менее важной — low. Новая задача получает статус todo.
+# Задачи и приоритет
+
+--- Шаг 2/6 ---
+INPUT estimate=1972 budget=2184
+Ответила модель: offline-fixture
+usage: статистика отсутствует
+finish_reason: tool_calls
+Инструмент: add_task
+Аргументы: {"title": "Проверить отчёт", "priority": "mid"}
+
+Создание файла: tasks.json
+Предлагаемое содержимое:
+-----
+[
+  {
+    "id": "10b2c0946a7a42088d238a91d8b8d218",
+    "title": "Проверить отчёт",
+    "priority": "mid",
+    "status": "todo"
+  }
+]
+-----
+Результат: Задача добавлена: Проверить отчёт. Приоритет: mid. ID: 10b2c0946a7a42088d238a91d8b8d218.
+
+--- Шаг 3/6 ---
+INPUT estimate=2050 budget=2184
+Ответила модель: offline-fixture
+usage: статистика отсутствует
+finish_reason: tool_calls
+Инструмент: add_task
+Аргументы: {"title": "Подготовить защиту", "priority": "mid"}
+
+Перезапись файла: tasks.json
+Предлагаемое содержимое:
+-----
+[
+  {
+    "id": "10b2c0946a7a42088d238a91d8b8d218",
+    "title": "Проверить отчёт",
+    "priority": "mid",
+    "status": "todo"
+  },
+  {
+    "id": "44f60ef0e86249949627044cabeaa9a9",
+    "title": "Подготовить защиту",
+    "priority": "mid",
+    "status": "todo"
+  }
+]
+-----
+Результат: Задача добавлена: Подготовить защиту. Приоритет: mid. ID: 44f60ef0e86249949627044cabeaa9a9.
+
+--- Шаг 4/6 ---
+INPUT estimate=2129 budget=2184
+Ответила модель: offline-fixture
+usage: статистика отсутствует
+finish_reason: tool_calls
+Инструмент: list_tasks
+Аргументы: {"status": "todo"}
+Результат: 1. Проверить отчёт | приоритет: mid | статус: todo | ID: 10b2c0946a7a42088d238a91d8b8d218
+2. Подготовить защиту | приоритет: mid | статус: todo | ID: 44f60ef0e86249949627044cabeaa9a9
+
+--- Шаг 5/6 ---
+TRIM: removed=2 before=2222 after=1260
+INPUT estimate=1260 budget=2184
+Ответила модель: offline-fixture
+usage: статистика отсутствует
+finish_reason: stop
+Сценарий тестового сервера завершён.
+
+=== summarize, режим=локальный сценарий, бюджет=2184 ===
+
+--- Шаг 1/6 ---
+INPUT estimate=1874 budget=2184
+Ответила модель: offline-fixture
+usage: статистика отсутствует
+finish_reason: tool_calls
+Инструмент: search_docs
+Аргументы: {"query": "приоритет по умолчанию", "limit": 1}
+Результат: docs/tasks.md:
+Приоритет по умолчанию — mid (средний). Для срочной задачи укажите high, для менее важной — low. Новая задача получает статус todo.
+# Задачи и приоритет
+
+--- Шаг 2/6 ---
+INPUT estimate=1972 budget=2184
+Ответила модель: offline-fixture
+usage: статистика отсутствует
+finish_reason: tool_calls
+Инструмент: add_task
+Аргументы: {"title": "Проверить отчёт", "priority": "mid"}
+
+Создание файла: tasks.json
+Предлагаемое содержимое:
+-----
+[
+  {
+    "id": "6f85504165b848a5a5691b9918db2fe3",
+    "title": "Проверить отчёт",
+    "priority": "mid",
+    "status": "todo"
+  }
+]
+-----
+Результат: Задача добавлена: Проверить отчёт. Приоритет: mid. ID: 6f85504165b848a5a5691b9918db2fe3.
+
+--- Шаг 3/6 ---
+INPUT estimate=2050 budget=2184
+Ответила модель: offline-fixture
+usage: статистика отсутствует
+finish_reason: tool_calls
+Инструмент: add_task
+Аргументы: {"title": "Подготовить защиту", "priority": "mid"}
+
+Перезапись файла: tasks.json
+Предлагаемое содержимое:
+-----
+[
+  {
+    "id": "6f85504165b848a5a5691b9918db2fe3",
+    "title": "Проверить отчёт",
+    "priority": "mid",
+    "status": "todo"
+  },
+  {
+    "id": "25f0ab61d56f44bf8b8a9a6d730c50d6",
+    "title": "Подготовить защиту",
+    "priority": "mid",
+    "status": "todo"
+  }
+]
+-----
+Результат: Задача добавлена: Подготовить защиту. Приоритет: mid. ID: 25f0ab61d56f44bf8b8a9a6d730c50d6.
+
+--- Шаг 4/6 ---
+INPUT estimate=2129 budget=2184
+Ответила модель: offline-fixture
+usage: статистика отсутствует
+finish_reason: tool_calls
+Инструмент: list_tasks
+Аргументы: {"status": "todo"}
+Результат: 1. Проверить отчёт | приоритет: mid | статус: todo | ID: 6f85504165b848a5a5691b9918db2fe3
+2. Подготовить защиту | приоритет: mid | статус: todo | ID: 25f0ab61d56f44bf8b8a9a6d730c50d6
+
+--- Шаг 5/6 ---
+SUMMARY INPUT estimate=1011 budget=2184
+SUMMARY model=offline-fixture usage=None
+SUMMARY: removed=2 before=2222 after=1281
+INPUT estimate=1281 budget=2184
+Ответила модель: offline-fixture
+usage: статистика отсутствует
+finish_reason: stop
+Сценарий тестового сервера завершён.
