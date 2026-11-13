@@ -226,3 +226,5 @@ agent/workspace/
 # Виртуальное окружение и кэш Python
 .venv/
 *.pyc
+agent/sessions/*
+!agent/sessions/.gitkeep

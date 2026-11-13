@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 from pathlib import Path
@@ -5,6 +6,12 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 from openai import OpenAI, OpenAIError
+
+
+if __package__:
+    from .sessions import Session
+else:
+    from sessions import Session
 
 
 AGENT_DIR = Path(__file__).resolve().parent
@@ -368,7 +375,7 @@ def execute_tool(name, raw_args):
         return f"ОШИБКА: {error}"
 
 
-def run_agent(client, model, messages):
+def run_agent(client, model, messages, checkpoint=lambda _: None):
     """Выполняет не более MAX_STEPS запросов модели."""
     for step in range(1, MAX_STEPS + 1):
         print(f"\n--- Шаг {step}/{MAX_STEPS} ---")
@@ -399,6 +406,7 @@ def run_agent(client, model, messages):
         messages.append(message.model_dump(exclude_none=True))
 
         if not message.tool_calls:
+            checkpoint(messages)
             return message.content or "Модель не вернула текст ответа."
 
         # На каждый tool_call обязательно добавляем отдельный результат.
@@ -420,12 +428,15 @@ def run_agent(client, model, messages):
                 "content": result,
             })
 
+        checkpoint(messages)
+
     answer = (
         f"Достигнут лимит шагов ({MAX_STEPS}). "
         "Выполнение остановлено без итогового ответа модели. "
         "Результаты выполненных инструментов сохранены в истории."
     )
     messages.append({"role": "assistant", "content": answer})
+    checkpoint(messages)
     return answer
 
 
@@ -443,9 +454,15 @@ def main():
 
     WORKSPACE.mkdir(parents=True, exist_ok=True)
 
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-    ]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--session", default=os.getenv("SESSION_ID", "default"))
+    args = parser.parse_args()
+    try:
+        session = Session(AGENT_DIR / "sessions", args.session, api_key)
+        messages = session.load(SYSTEM_PROMPT)
+    except (ValueError, OSError) as error:
+        parser.exit(1, f"Не удалось открыть сессию: {error}\n")
+    print(f"Сессия: {args.session}; загружено сообщений: {len(messages) - 1}")
 
     print(f"Настроенная модель: {model}")
     print(f"Песочница: {WORKSPACE}")
@@ -473,18 +490,28 @@ def main():
 
             # Запоминаем границу текущего запроса для восстановления
             # истории при ошибке API или прерывании.
-            history_length = len(messages)
+            previous = list(messages)
             messages.append({"role": "user", "content": user_text})
 
             try:
-                answer = run_agent(client, model, messages)
+                session.save(messages)
+                answer = run_agent(client, model, messages, session.save)
+            except OSError as error:
+                print(f"Ошибка файла сессии: {error}")
+                break
             except (OpenAIError, ValueError) as error:
-                del messages[history_length:]
+                messages[:] = session.load(SYSTEM_PROMPT)
+                if messages[-1].get("role") == "user":
+                    messages[:] = previous
+                session.save(messages)
                 print(f"Ошибка: {error}")
-                print("Текущий запрос удалён из истории. Можно повторить.")
+                print("Завершённые шаги сохранены. Проверь состояние перед повтором.")
                 continue
             except KeyboardInterrupt:
-                del messages[history_length:]
+                messages[:] = session.load(SYSTEM_PROMPT)
+                if messages[-1].get("role") == "user":
+                    messages[:] = previous
+                session.save(messages)
                 print("\nЗапрос прерван. Диалог завершён.")
                 break
 
