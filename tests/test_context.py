@@ -24,3 +24,14 @@ class Budget(unittest.TestCase):
     def test_active_turn_too_big(self):
         with self.assertRaises(ValueError):
             ctx.ensure_context_budget([system,user("x"*2000)],[],50)
+
+class Memory(unittest.TestCase):
+    def test_summary_and_fallback(self):
+        data = [system,user("имя Тимур "+"длинно "*300), answer("принято"),user("моя цель?")]
+        view = ctx.ensure_context_budget(data,[],100,summarize=lambda dropped: "Имя: Тимур")
+        self.assertIn("[память диалога]",view[1]["content"])
+        self.assertLessEqual(ctx.estimate(view),100)
+        self.assertEqual(view[0],system)
+        self.assertEqual(view[-1],data[-1])
+        def fail(_): raise ValueError("Нет ответа")
+        self.assertEqual(ctx.ensure_context_budget(data,[],100,summarize=fail),[system,data[-1]])
